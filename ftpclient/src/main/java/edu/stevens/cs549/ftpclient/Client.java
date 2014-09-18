@@ -5,10 +5,12 @@
 
 package edu.stevens.cs549.ftpclient;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,9 +68,11 @@ public class Client {
 			String serverName = (String) props.get("server.name");
 			int serverPort = Integer.parseInt((String) props.get("server.port"));
 
+			// Added by Hongzheng Wang: Get a server proxy.
 			Registry registry = LocateRegistry.getRegistry(serverPort);
 			IServerFactory serverFactory = (IServerFactory) registry.lookup(serverName);
 			IServer server = serverFactory.createServer();
+			// End Added by Hongzheng Wang
 
 			/*
 			 * Start CLI.  Second argument should be server proxy.
@@ -243,6 +247,7 @@ public class Client {
 					/*
 					 * TODO: Complete this thread.
 					 */
+
 					Socket xfer = dataChan.accept();
 
 					/*
@@ -262,9 +267,8 @@ public class Client {
 						svr.get(inputs[1]);
 						FileOutputStream f = new FileOutputStream(inputs[1]);
 						Socket xfer = new Socket(serverAddress, serverSocket.getPort());
-						/*
-						 * TODO: connect to server socket to transfer file.
-						 */
+
+						// Added by Hongzheng Wang: connect to server socket to transfer file.
 						InputStream is = xfer.getInputStream();
 						int bufferSize = xfer.getReceiveBufferSize();
 						BufferedOutputStream bos = new BufferedOutputStream(f);
@@ -276,7 +280,8 @@ public class Client {
     					bos.flush();
     					bos.close();
     					is.close();
-    					xfer.close();
+    					// End Added by Hongzheng Wang
+
 					} else if (mode == Mode.ACTIVE) {
 						FileOutputStream f = new FileOutputStream(inputs[1]);
 						new Thread(new GetThread(dataChan, f)).start();
@@ -293,9 +298,32 @@ public class Client {
 		public void put(String[] inputs) {
 			if (inputs.length == 2) {
 				try {
-					/*
-					 * TODO: Finish put.
-					 */
+					// Added by Hongzheng Wang
+					if (mode == Mode.PASSIVE) {
+
+						Socket xfer = new Socket(serverAddress, serverSocket.getPort());
+						FileInputStream f = new FileInputStream(inputs[1]);
+						BufferedInputStream bis = new BufferedInputStream(f);
+			    	    BufferedOutputStream out = new BufferedOutputStream(xfer.getOutputStream());
+
+						int count;
+			    	    byte[] bytes = new byte[100];
+
+			    	    while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
+			    	        out.write(bytes, 0, count);
+			    	    }
+
+			    	    out.flush();
+			    	    out.close();
+			    	    bis.close();
+			    	    svr.put(inputs[1]);
+
+					} else if (mode == Mode.ACTIVE) {
+
+					} else {
+						msgln("GET: No mode set--use port or pasv command.");
+					}
+					// End Added by Hongzheng Wang
 				} catch (Exception e) {
 					err(e);
 				}
