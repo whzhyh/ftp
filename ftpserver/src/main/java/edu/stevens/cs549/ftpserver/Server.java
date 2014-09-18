@@ -140,14 +140,24 @@ public class Server extends UnicastRemoteObject
             throw new IOException("Bad file name: " + file);
         } else if (mode == Mode.ACTIVE) {
         	Socket xfer = new Socket (clientSocket.getAddress(), clientSocket.getPort());
-        	/*
-        	 * TODO: connect to client socket to transfer file.
-        	 */
+
+        	// Added by Hongzheng Wang: connect to client socket to transfer file.
         	InputStream in = new FileInputStream(path()+file);
 
-        	/*
-			 * End TODO.
-			 */
+            BufferedInputStream bis = new BufferedInputStream(in);
+            BufferedOutputStream out = new BufferedOutputStream(xfer.getOutputStream());
+
+            int count;
+            byte[] bytes = new byte[100];
+
+            while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
+                out.write(bytes, 0, count);
+            }
+
+            out.flush();
+            out.close();
+            bis.close();
+        	// End added by Hongzheng Wang
         } else if (mode == Mode.PASSIVE) {
             FileInputStream f = new FileInputStream(path()+file);
             new Thread (new GetThread(dataChan, f)).start();
@@ -158,7 +168,7 @@ public class Server extends UnicastRemoteObject
         // Added by Hongzheng Wang: Finish put
         try {
             if (mode == Mode.PASSIVE) {
-                FileOutputStream f = new FileOutputStream(this.pathPrefix + file);
+                FileOutputStream f = new FileOutputStream(path() + file);
                 Socket xfer = dataChan.accept();
                 InputStream is = xfer.getInputStream();
                 int bufferSize = xfer.getReceiveBufferSize();

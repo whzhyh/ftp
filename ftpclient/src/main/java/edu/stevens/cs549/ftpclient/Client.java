@@ -244,15 +244,21 @@ public class Client {
 
 			public void run() {
 				try {
-					/*
-					 * TODO: Complete this thread.
-					 */
+					// Added by Hongzheng Wang: Complete this thread.
 
 					Socket xfer = dataChan.accept();
-
-					/*
-					 * End TODO
-					 */
+	                InputStream is = xfer.getInputStream();
+	                int bufferSize = xfer.getReceiveBufferSize();
+	                BufferedOutputStream bos = new BufferedOutputStream(file);
+	                byte[] bytes = new byte[bufferSize];
+	                int count = 0;
+	                while ((count = is.read(bytes)) > 0) {
+	                   bos.write(bytes, 0, count);
+	                }
+	                bos.flush();
+	                bos.close();
+	                is.close();
+					// End added by Hongzheng Wang
 				} catch (IOException e) {
 					msg("Exception: " + e);
 					e.printStackTrace();
@@ -319,7 +325,7 @@ public class Client {
 			    	    svr.put(inputs[1]);
 
 					} else if (mode == Mode.ACTIVE) {
-
+						// TODO
 					} else {
 						msgln("GET: No mode set--use port or pasv command.");
 					}
