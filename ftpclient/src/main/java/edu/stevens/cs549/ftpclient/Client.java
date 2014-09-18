@@ -5,6 +5,7 @@
 
 package edu.stevens.cs549.ftpclient;
 
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -17,15 +18,18 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.util.Properties;
 import java.util.logging.Logger;
 
 import org.apache.log4j.PropertyConfigurator;
 
 import edu.stevens.cs549.ftpinterface.IServer;
+import edu.stevens.cs549.ftpinterface.IServerFactory;
 
 /**
- * 
+ *
  * @author dduggan
  */
 public class Client {
@@ -45,7 +49,7 @@ public class Client {
 		}
 		new Client();
 	}
-	
+
 	InetAddress serverAddress;
 
 	public Client() {
@@ -61,13 +65,11 @@ public class Client {
 			String serverMachine = (String) props.get("server.machine");
 			String serverName = (String) props.get("server.name");
 			int serverPort = Integer.parseInt((String) props.get("server.port"));
-			
-			/*
-			 * TODO: Get a server proxy.
-			 */
-			
-			IServer server = null;
-			
+
+			Registry registry = LocateRegistry.getRegistry(serverPort);
+			IServerFactory serverFactory = (IServerFactory) registry.lookup(serverName);
+			IServer server = serverFactory.createServer();
+
 			/*
 			 * Start CLI.  Second argument should be server proxy.
 			 */
@@ -147,14 +149,14 @@ public class Client {
 			err(e);
 			System.exit(-1);
 		}
-		
+
 
 	}
 
 	public static class Dispatch {
 
 		private IServer svr;
-		
+
 		private InetAddress serverAddress;
 
 		Dispatch(IServer s, InetAddress sa) {
@@ -200,7 +202,7 @@ public class Client {
 		private InetSocketAddress makeActive() throws IOException {
 			dataChan = new ServerSocket(0);
 			mode = Mode.ACTIVE;
-			/* 
+			/*
 			 * Note: this only works (for the server) if the client is not behind a NAT.
 			 */
 			return (InetSocketAddress) (dataChan.getLocalSocketAddress());
@@ -263,6 +265,18 @@ public class Client {
 						/*
 						 * TODO: connect to server socket to transfer file.
 						 */
+						InputStream is = xfer.getInputStream();
+						int bufferSize = xfer.getReceiveBufferSize();
+						BufferedOutputStream bos = new BufferedOutputStream(f);
+						byte[] bytes = new byte[bufferSize];
+						int count = 0;
+						while ((count = is.read(bytes)) > 0) {
+     					   bos.write(bytes, 0, count);
+    					}
+    					bos.flush();
+    					bos.close();
+    					is.close();
+    					xfer.close();
 					} else if (mode == Mode.ACTIVE) {
 						FileOutputStream f = new FileOutputStream(inputs[1]);
 						new Thread(new GetThread(dataChan, f)).start();

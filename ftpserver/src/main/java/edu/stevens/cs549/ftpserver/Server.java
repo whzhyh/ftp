@@ -1,5 +1,7 @@
 package edu.stevens.cs549.ftpserver;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -23,63 +25,63 @@ import edu.stevens.cs549.ftpinterface.IServer;
  */
 public class Server extends UnicastRemoteObject
         implements IServer {
-	
+
 	static final long serialVersionUID = 0L;
-	
+
 	public static Logger log = Logger.getLogger("edu.stevens.cs.cs549.ftpserver");
-    
+
 	/*
-	 * For multi-homed hosts, must specify IP address on which to 
+	 * For multi-homed hosts, must specify IP address on which to
 	 * bind a server socket for file transfers.  See the constructor
 	 * for ServerSocket that allows an explicit IP address as one
 	 * of its arguments.
 	 */
 	private InetAddress host;
-	
+
 	final static int backlog = 5;
-	
+
 	/*
 	 *********************************************************************************************
 	 * Current working directory.
 	 */
     static final int MAX_PATH_LEN = 1024;
     private Stack<String> cwd = new Stack<String>();
-    
+
     /*
      *********************************************************************************************
      * Data connection.
      */
-    
+
     enum Mode { NONE, PASSIVE, ACTIVE };
-    
+
     private Mode mode = Mode.NONE;
-    
+
     /*
      * If passive mode, remember the server socket.
      */
-    
+
     private ServerSocket dataChan = null;
-    
+
     private InetSocketAddress makePassive () throws IOException {
     	dataChan = new ServerSocket(0, backlog, host);
     	mode = Mode.PASSIVE;
     	return (InetSocketAddress)(dataChan.getLocalSocketAddress());
     }
-    
+
     /*
      * If active mode, remember the client socket address.
      */
     private InetSocketAddress clientSocket = null;
-    
+
     private void makeActive (InetSocketAddress s) {
     	clientSocket = s;
     	mode = Mode.ACTIVE;
     }
-    
+
     /*
      **********************************************************************************************
      */
-            
+
     /*
      * The server can be initialized to only provide subdirectories
      * of a directory specified at start-up.
@@ -92,16 +94,16 @@ public class Server extends UnicastRemoteObject
     	this.pathPrefix = prefix + "/";
         log.info("A client has bound to a server instance.");
     }
-    
+
     public Server(InetAddress host, int port) throws RemoteException {
         this(host, port, "/");
     }
-    
+
     private boolean valid (String s) {
         // File names should not contain "/".
         return (s.indexOf('/')<0);
     }
-    
+
     private static class GetThread implements Runnable {
     	private ServerSocket dataChan = null;
     	private FileInputStream file = null;
@@ -110,9 +112,31 @@ public class Server extends UnicastRemoteObject
     		/*
     		 * TODO: Process a client request to transfer a file.
     		 */
+    		try {
+	    		Socket clientSocket = dataChan.accept();
+	    		BufferedInputStream bis = new BufferedInputStream(file);
+	    	    BufferedOutputStream out = new BufferedOutputStream(clientSocket.getOutputStream());
+	
+	    	    int count;
+	    	    byte[] bytes = new byte[100];
+	    	    
+	    	    while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
+	    	        out.write(bytes, 0, count);
+	    	    }
+	
+	    	    out.flush();
+	    	    out.close();
+	    	    bis.close();    	    
+				dataChan.close();
+				clientSocket.close();
+			} catch (Exception e) {
+				System.out.println("Server Exception : "+e.getMessage());
+	            e.printStackTrace();
+			}
+
     	}
     }
-    
+
     public void get (String file) throws IOException, FileNotFoundException, RemoteException {
         if (!valid(file)) {
             throw new IOException("Bad file name: " + file);
@@ -131,13 +155,13 @@ public class Server extends UnicastRemoteObject
             new Thread (new GetThread(dataChan, f)).start();
         }
     }
-    
+
     public void put (String file) throws IOException, FileNotFoundException, RemoteException {
     	/*
     	 * TODO: Finish put.
     	 */
     }
-    
+
     public String[] dir () throws RemoteException {
         // List the contents of the current directory.
         return new File(path()).list();
@@ -175,15 +199,15 @@ public class Server extends UnicastRemoteObject
         }
         return p;
     }
-    
+
     private String path () throws RemoteException {
     	return pathPrefix+pwd();
     }
-    
+
     public void port (InetSocketAddress s) {
     	makeActive(s);
     }
-    
+
     public InetSocketAddress pasv () throws IOException {
     	return makePassive();
     }
