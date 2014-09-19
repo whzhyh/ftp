@@ -246,17 +246,7 @@ public class Client {
 				try {
 					// Added by Hongzheng Wang: Complete this thread.
 					Socket xfer = dataChan.accept();
-	                InputStream is = xfer.getInputStream();
-	                int bufferSize = xfer.getReceiveBufferSize();
-	                BufferedOutputStream bos = new BufferedOutputStream(file);
-	                byte[] bytes = new byte[bufferSize];
-	                int count = 0;
-	                while ((count = is.read(bytes)) > 0) {
-	                   bos.write(bytes, 0, count);
-	                }
-	                bos.flush();
-	                bos.close();
-	                is.close();
+					readFromSocket(xfer, file);
 					// End added by Hongzheng Wang
 				} catch (IOException e) {
 					msg("Exception: " + e);
@@ -264,6 +254,50 @@ public class Client {
 				}
 			}
 		}
+
+		// Added by Hongzheng Wang
+		// Extract the logic of reading data from socket and writing it to local file system
+		// This method will be called at "get" function
+		private static void readFromSocket(Socket xfer, FileOutputStream f) {
+	    	try {
+		        InputStream is = xfer.getInputStream();
+		        int bufferSize = xfer.getReceiveBufferSize();
+		        BufferedOutputStream bos = new BufferedOutputStream(f);
+		        byte[] bytes = new byte[bufferSize];
+		        int count = 0;
+		        while ((count = is.read(bytes)) > 0) {
+		           bos.write(bytes, 0, count);
+		        }
+		        bos.flush();
+		        bos.close();
+		        is.close();
+	    	} catch (Exception e) {
+	            System.out.println("Server Exception : "+e.getMessage());
+	            e.printStackTrace();
+	        }
+	    }
+
+	    // Added by Hongzheng Wang
+		// Extract the logic of reading local file and transfering it via socket to server
+		// This method will be called at "put" function
+	    private static void writeToSocket(Socket xfer, FileInputStream in) {
+	    	try {
+		        BufferedInputStream bis = new BufferedInputStream(in);
+		        BufferedOutputStream out = new BufferedOutputStream(xfer.getOutputStream());
+		        int count;
+		        byte[] bytes = new byte[512];
+
+		        while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
+		            out.write(bytes, 0, count);
+		        }
+		        out.flush();
+		        out.close();
+		        bis.close();
+	    	} catch (Exception e) {
+	            System.out.println("Server Exception : "+e.getMessage());
+	            e.printStackTrace();
+	        }
+	    }
 
 		public void get(String[] inputs) {
 			if (inputs.length == 2) {
@@ -274,17 +308,7 @@ public class Client {
 						Socket xfer = new Socket(serverAddress, serverSocket.getPort());
 
 						// Added by Hongzheng Wang: connect to server socket to transfer file.
-						InputStream is = xfer.getInputStream();
-						int bufferSize = xfer.getReceiveBufferSize();
-						BufferedOutputStream bos = new BufferedOutputStream(f);
-						byte[] bytes = new byte[bufferSize];
-						int count = 0;
-						while ((count = is.read(bytes)) > 0) {
-     					   bos.write(bytes, 0, count);
-    					}
-    					bos.flush();
-    					bos.close();
-    					is.close();
+						readFromSocket(xfer, f);
     					// End Added by Hongzheng Wang
 
 					} else if (mode == Mode.ACTIVE) {
@@ -305,43 +329,15 @@ public class Client {
 				try {
 					// Added by Hongzheng Wang
 					if (mode == Mode.PASSIVE) {
-
 						Socket xfer = new Socket(serverAddress, serverSocket.getPort());
 						FileInputStream f = new FileInputStream(inputs[1]);
-						BufferedInputStream bis = new BufferedInputStream(f);
-			    	    BufferedOutputStream out = new BufferedOutputStream(xfer.getOutputStream());
-
-						int count;
-			    	    byte[] bytes = new byte[100];
-
-			    	    while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
-			    	        out.write(bytes, 0, count);
-			    	    }
-
-			    	    out.flush();
-			    	    out.close();
-			    	    bis.close();
+						writeToSocket(xfer, f);
 			    	    svr.put(inputs[1]);
-
 					} else if (mode == Mode.ACTIVE) {
 						svr.put(inputs[1]);
-
 		                FileInputStream f = new FileInputStream(inputs[1]);
 		                Socket clientSocket = dataChan.accept();
-			    		BufferedInputStream bis = new BufferedInputStream(f);
-			    	    BufferedOutputStream out = new BufferedOutputStream(clientSocket.getOutputStream());
-
-			    	    int count;
-			    	    byte[] bytes = new byte[100];
-
-			    	    while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
-			    	        out.write(bytes, 0, count);
-			    	    }
-
-			    	    out.flush();
-			    	    out.close();
-			    	    bis.close();
-
+		                writeToSocket(clientSocket, f);
 					} else {
 						msgln("GET: No mode set--use port or pasv command.");
 					}

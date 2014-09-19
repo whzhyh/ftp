@@ -107,59 +107,72 @@ public class Server extends UnicastRemoteObject
 
     private static class GetThread implements Runnable {
     	private ServerSocket dataChan = null;
-    	private FileInputStream file = null;
-    	public GetThread (ServerSocket s, FileInputStream f) { dataChan = s; file = f; }
-    	public void run () {
-    		//Added by Hongzheng Wang: Process a client request to transfer a file.
-    		try {
-	    		Socket clientSocket = dataChan.accept();
-	    		BufferedInputStream bis = new BufferedInputStream(file);
-	    	    BufferedOutputStream out = new BufferedOutputStream(clientSocket.getOutputStream());
-
-	    	    int count;
-	    	    byte[] bytes = new byte[100];
-
-	    	    while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
-	    	        out.write(bytes, 0, count);
-	    	    }
-
-	    	    out.flush();
-	    	    out.close();
-	    	    bis.close();
-
-			} catch (Exception e) {
-				System.out.println("Server Exception : "+e.getMessage());
-	            e.printStackTrace();
-			}
-            //End Added by Hongzheng Wang
-    	}
-    }
-
-    private static class GetThread2 implements Runnable {
         private Socket xfer = null;
-        private FileOutputStream file = null;
-        public GetThread2 (Socket s, FileOutputStream f) { xfer = s; file = f; }
+    	private FileInputStream is = null;
+        private FileOutputStream os = null;
+    	public GetThread (ServerSocket s, FileInputStream f) { dataChan = s; is = f; }
+    	public GetThread (Socket s, FileOutputStream f) { xfer = s; os = f; }
         public void run () {
-            //Added by Hongzheng Wang: Process a client request to transfer a file.
+    		//Added by Hongzheng Wang: Process a client request to transfer a file.
             try {
-                InputStream is = xfer.getInputStream();
-                int bufferSize = xfer.getReceiveBufferSize();
-                BufferedOutputStream bos = new BufferedOutputStream(file);
-                byte[] bytes = new byte[bufferSize];
-                int count = 0;
-                while ((count = is.read(bytes)) > 0) {
-                   bos.write(bytes, 0, count);
+                if (xfer == null) {
+    	    		Socket clientSocket = dataChan.accept();
+    	    		writeToSocket(clientSocket, is);
+                } else {
+                    readFromSocket(xfer, os);
                 }
-                bos.flush();
-                bos.close();
-                is.close();
             } catch (Exception e) {
                 System.out.println("Server Exception : "+e.getMessage());
                 e.printStackTrace();
             }
             //End Added by Hongzheng Wang
+    	}
+    }
+
+    // Added by Hongzheng Wang
+    // Extract the logic of reading data from socket and writing it to local file system
+    // This method will be called at "put" function
+    private static void readFromSocket(Socket xfer, FileOutputStream f) {
+    	try {
+	        InputStream is = xfer.getInputStream();
+	        int bufferSize = xfer.getReceiveBufferSize();
+	        BufferedOutputStream bos = new BufferedOutputStream(f);
+	        byte[] bytes = new byte[bufferSize];
+	        int count = 0;
+	        while ((count = is.read(bytes)) > 0) {
+	           bos.write(bytes, 0, count);
+	        }
+	        bos.flush();
+	        bos.close();
+	        is.close();
+    	} catch (Exception e) {
+            System.out.println("Server Exception : "+e.getMessage());
+            e.printStackTrace();
         }
     }
+
+    // Added by Hongzheng Wang
+    // Extract the logic of reading local file and transfering it via socket to server
+    // This method will be called at "get" function
+    private static void writeToSocket(Socket xfer, FileInputStream in){
+    	try {
+            BufferedInputStream bis = new BufferedInputStream(in);
+            BufferedOutputStream out = new BufferedOutputStream(xfer.getOutputStream());
+            int count;
+            byte[] bytes = new byte[512];
+
+            while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
+                out.write(bytes, 0, count);
+            }
+            out.flush();
+            out.close();
+            bis.close();
+    	} catch (Exception e) {
+            System.out.println("Server Exception : "+e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     public void get (String file) throws IOException, FileNotFoundException, RemoteException {
         if (!valid(file)) {
             throw new IOException("Bad file name: " + file);
@@ -167,22 +180,10 @@ public class Server extends UnicastRemoteObject
         	Socket xfer = new Socket (clientSocket.getAddress(), clientSocket.getPort());
 
         	// Added by Hongzheng Wang: connect to client socket to transfer file.
-        	InputStream in = new FileInputStream(path()+file);
-
-            BufferedInputStream bis = new BufferedInputStream(in);
-            BufferedOutputStream out = new BufferedOutputStream(xfer.getOutputStream());
-
-            int count;
-            byte[] bytes = new byte[100];
-
-            while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
-                out.write(bytes, 0, count);
-            }
-
-            out.flush();
-            out.close();
-            bis.close();
+        	FileInputStream in = new FileInputStream(path()+file);
+            writeToSocket(xfer, in);
         	// End added by Hongzheng Wang
+
         } else if (mode == Mode.PASSIVE) {
             FileInputStream f = new FileInputStream(path()+file);
             new Thread (new GetThread(dataChan, f)).start();
@@ -195,22 +196,11 @@ public class Server extends UnicastRemoteObject
             if (mode == Mode.PASSIVE) {
                 FileOutputStream f = new FileOutputStream(path() + file);
                 Socket xfer = dataChan.accept();
-                InputStream is = xfer.getInputStream();
-                int bufferSize = xfer.getReceiveBufferSize();
-                BufferedOutputStream bos = new BufferedOutputStream(f);
-                byte[] bytes = new byte[bufferSize];
-                int count = 0;
-                while ((count = is.read(bytes)) > 0) {
-                   bos.write(bytes, 0, count);
-                }
-                bos.flush();
-                bos.close();
-                is.close();
-
+                readFromSocket(xfer, f);
             } else if (mode == Mode.ACTIVE) {
                 FileOutputStream f = new FileOutputStream(path() + file);
                 Socket xfer = new Socket (clientSocket.getAddress(), clientSocket.getPort());
-                new Thread (new GetThread2(xfer, f)).start();
+                new Thread (new GetThread(xfer, f)).start();
             }
         } catch (Exception e) {
             System.out.println("Server Exception : "+e.getMessage());
