@@ -245,7 +245,6 @@ public class Client {
 			public void run() {
 				try {
 					// Added by Hongzheng Wang: Complete this thread.
-
 					Socket xfer = dataChan.accept();
 	                InputStream is = xfer.getInputStream();
 	                int bufferSize = xfer.getReceiveBufferSize();
@@ -325,7 +324,24 @@ public class Client {
 			    	    svr.put(inputs[1]);
 
 					} else if (mode == Mode.ACTIVE) {
-						// TODO
+						svr.put(inputs[1]);
+
+		                FileInputStream f = new FileInputStream(inputs[1]);
+		                Socket clientSocket = dataChan.accept();
+			    		BufferedInputStream bis = new BufferedInputStream(f);
+			    	    BufferedOutputStream out = new BufferedOutputStream(clientSocket.getOutputStream());
+
+			    	    int count;
+			    	    byte[] bytes = new byte[100];
+
+			    	    while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
+			    	        out.write(bytes, 0, count);
+			    	    }
+
+			    	    out.flush();
+			    	    out.close();
+			    	    bis.close();
+
 					} else {
 						msgln("GET: No mode set--use port or pasv command.");
 					}

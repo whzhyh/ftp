@@ -135,6 +135,31 @@ public class Server extends UnicastRemoteObject
     	}
     }
 
+    private static class GetThread2 implements Runnable {
+        private Socket xfer = null;
+        private FileOutputStream file = null;
+        public GetThread2 (Socket s, FileOutputStream f) { xfer = s; file = f; }
+        public void run () {
+            //Added by Hongzheng Wang: Process a client request to transfer a file.
+            try {
+                InputStream is = xfer.getInputStream();
+                int bufferSize = xfer.getReceiveBufferSize();
+                BufferedOutputStream bos = new BufferedOutputStream(file);
+                byte[] bytes = new byte[bufferSize];
+                int count = 0;
+                while ((count = is.read(bytes)) > 0) {
+                   bos.write(bytes, 0, count);
+                }
+                bos.flush();
+                bos.close();
+                is.close();
+            } catch (Exception e) {
+                System.out.println("Server Exception : "+e.getMessage());
+                e.printStackTrace();
+            }
+            //End Added by Hongzheng Wang
+        }
+    }
     public void get (String file) throws IOException, FileNotFoundException, RemoteException {
         if (!valid(file)) {
             throw new IOException("Bad file name: " + file);
@@ -183,7 +208,9 @@ public class Server extends UnicastRemoteObject
                 is.close();
 
             } else if (mode == Mode.ACTIVE) {
-
+                FileOutputStream f = new FileOutputStream(path() + file);
+                Socket xfer = new Socket (clientSocket.getAddress(), clientSocket.getPort());
+                new Thread (new GetThread2(xfer, f)).start();
             }
         } catch (Exception e) {
             System.out.println("Server Exception : "+e.getMessage());
