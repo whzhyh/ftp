@@ -69,7 +69,7 @@ public class Client {
 			int serverPort = Integer.parseInt((String) props.get("server.port"));
 
 			// Added by Hongzheng Wang: Get a server proxy.
-			Registry registry = LocateRegistry.getRegistry(serverPort);
+			Registry registry = LocateRegistry.getRegistry(serverMachine, serverPort);
 			IServerFactory serverFactory = (IServerFactory) registry.lookup(serverName);
 			IServer server = serverFactory.createServer();
 			// End Added by Hongzheng Wang

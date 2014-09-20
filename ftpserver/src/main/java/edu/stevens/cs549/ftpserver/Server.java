@@ -106,18 +106,18 @@ public class Server extends UnicastRemoteObject
     }
 
     private static class GetThread implements Runnable {
-    	private ServerSocket dataChan = null;
+        private ServerSocket dataChan = null;
         private Socket xfer = null;
-    	private FileInputStream is = null;
+        private FileInputStream is = null;
         private FileOutputStream os = null;
-    	public GetThread (ServerSocket s, FileInputStream f) { dataChan = s; is = f; }
-    	public GetThread (Socket s, FileOutputStream f) { xfer = s; os = f; }
+        public GetThread (ServerSocket s, FileInputStream f) { dataChan = s; is = f; }
+        public GetThread (Socket s, FileOutputStream f) { xfer = s; os = f; }
         public void run () {
-    		//Added by Hongzheng Wang: Process a client request to transfer a file.
+            //Added by Hongzheng Wang: Process a client request to transfer a file.
             try {
                 if (xfer == null) {
-    	    		Socket clientSocket = dataChan.accept();
-    	    		writeToSocket(clientSocket, is);
+                    Socket clientSocket = dataChan.accept();
+                    writeToSocket(clientSocket, is);
                 } else {
                     readFromSocket(xfer, os);
                 }
@@ -126,7 +126,7 @@ public class Server extends UnicastRemoteObject
                 e.printStackTrace();
             }
             //End Added by Hongzheng Wang
-    	}
+        }
     }
 
     // Added by Hongzheng Wang
