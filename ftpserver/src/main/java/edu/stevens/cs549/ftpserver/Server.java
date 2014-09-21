@@ -1,13 +1,12 @@
 package edu.stevens.cs549.ftpserver;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -132,21 +131,12 @@ public class Server extends UnicastRemoteObject
     // Added by Hongzheng Wang
     // Extract the logic of reading data from socket and writing it to local file system
     // This method will be called at "put" function
-    private static void readFromSocket(Socket xfer, FileOutputStream f) {
-    	try {
-	        InputStream is = xfer.getInputStream();
-	        int bufferSize = xfer.getReceiveBufferSize();
-	        BufferedOutputStream bos = new BufferedOutputStream(f);
-	        byte[] bytes = new byte[bufferSize];
-	        int count = 0;
-	        while ((count = is.read(bytes)) > 0) {
-	           bos.write(bytes, 0, count);
-	        }
-	        bos.flush();
-	        bos.close();
-	        is.close();
-    	} catch (Exception e) {
-            System.out.println("Server Exception : "+e.getMessage());
+    private static void readFromSocket(Socket xfer, FileOutputStream os) {
+        try {
+            InputStream is = xfer.getInputStream();
+            ReadAndWrite(is, os);
+        } catch (Exception e) {
+            System.out.println("Exception: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -154,21 +144,31 @@ public class Server extends UnicastRemoteObject
     // Added by Hongzheng Wang
     // Extract the logic of reading local file and transfering it via socket to server
     // This method will be called at "get" function
-    private static void writeToSocket(Socket xfer, FileInputStream in){
-    	try {
-            BufferedInputStream bis = new BufferedInputStream(in);
-            BufferedOutputStream out = new BufferedOutputStream(xfer.getOutputStream());
-            int count;
+    private static void writeToSocket(Socket xfer, FileInputStream is) {
+        try {
+            OutputStream os = xfer.getOutputStream();
+            ReadAndWrite(is, os);
+        } catch (Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // Added by Hongzheng Wang
+    // Read from input stream and Write data to output stream
+    private static void ReadAndWrite(InputStream is, OutputStream os) {
+        try {
+            int count = 0;
             byte[] bytes = new byte[512];
 
-            while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
-                out.write(bytes, 0, count);
+            while ((count = is.read(bytes, 0, bytes.length)) > 0) {
+                os.write(bytes, 0, count);
             }
-            out.flush();
-            out.close();
-            bis.close();
-    	} catch (Exception e) {
-            System.out.println("Server Exception : "+e.getMessage());
+            os.flush();
+            os.close();
+            is.close();
+        } catch (Exception e) {
+            System.out.println("Exception: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -196,7 +196,7 @@ public class Server extends UnicastRemoteObject
             if (mode == Mode.PASSIVE) {
                 FileOutputStream f = new FileOutputStream(path() + file);
                 Socket xfer = dataChan.accept();
-                readFromSocket(xfer, f);
+                new Thread (new GetThread(xfer, f)).start();
             } else if (mode == Mode.ACTIVE) {
                 FileOutputStream f = new FileOutputStream(path() + file);
                 Socket xfer = new Socket (clientSocket.getAddress(), clientSocket.getPort());
