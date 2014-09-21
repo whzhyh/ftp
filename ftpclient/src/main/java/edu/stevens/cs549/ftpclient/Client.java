@@ -5,8 +5,6 @@
 
 package edu.stevens.cs549.ftpclient;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -15,6 +13,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -69,8 +68,13 @@ public class Client {
 			int serverPort = Integer.parseInt((String) props.get("server.port"));
 
 			// Added by Hongzheng Wang: Get a server proxy.
+			// Using public DNS or IP, and the port to get the register where the server registers services
 			Registry registry = LocateRegistry.getRegistry(serverMachine, serverPort);
+			// Using the service name, such as "ftpd",
+			// to find out the ServerFactory we registered on the server side
 			IServerFactory serverFactory = (IServerFactory) registry.lookup(serverName);
+			// Using ServerFactory to create a separated server object,
+			// in that way, we won't share states between different clients
 			IServer server = serverFactory.createServer();
 			// End Added by Hongzheng Wang
 
@@ -258,21 +262,12 @@ public class Client {
 		// Added by Hongzheng Wang
 		// Extract the logic of reading data from socket and writing it to local file system
 		// This method will be called at "get" function
-		private static void readFromSocket(Socket xfer, FileOutputStream f) {
+		private static void readFromSocket(Socket xfer, FileOutputStream os) {
 	    	try {
 		        InputStream is = xfer.getInputStream();
-		        int bufferSize = xfer.getReceiveBufferSize();
-		        BufferedOutputStream bos = new BufferedOutputStream(f);
-		        byte[] bytes = new byte[bufferSize];
-		        int count = 0;
-		        while ((count = is.read(bytes)) > 0) {
-		           bos.write(bytes, 0, count);
-		        }
-		        bos.flush();
-		        bos.close();
-		        is.close();
+		        ReadAndWrite(is, os);
 	    	} catch (Exception e) {
-	            System.out.println("Server Exception : "+e.getMessage());
+	            System.out.println("Exception: " + e.getMessage());
 	            e.printStackTrace();
 	        }
 	    }
@@ -280,21 +275,31 @@ public class Client {
 	    // Added by Hongzheng Wang
 		// Extract the logic of reading local file and transfering it via socket to server
 		// This method will be called at "put" function
-	    private static void writeToSocket(Socket xfer, FileInputStream in) {
+	    private static void writeToSocket(Socket xfer, FileInputStream is) {
 	    	try {
-		        BufferedInputStream bis = new BufferedInputStream(in);
-		        BufferedOutputStream out = new BufferedOutputStream(xfer.getOutputStream());
-		        int count;
-		        byte[] bytes = new byte[512];
-
-		        while ((count = bis.read(bytes, 0, bytes.length)) > 0) {
-		            out.write(bytes, 0, count);
-		        }
-		        out.flush();
-		        out.close();
-		        bis.close();
+		        OutputStream os = xfer.getOutputStream();
+		        ReadAndWrite(is, os);
 	    	} catch (Exception e) {
-	            System.out.println("Server Exception : "+e.getMessage());
+	            System.out.println("Exception: " + e.getMessage());
+	            e.printStackTrace();
+	        }
+	    }
+
+	    // Added by Hongzheng Wang
+	    // Read from input stream and Write data to output stream
+	    private static void ReadAndWrite(InputStream is, OutputStream os) {
+	        try {
+	            int count = 0;
+	            byte[] bytes = new byte[512];
+
+	            while ((count = is.read(bytes, 0, bytes.length)) > 0) {
+	                os.write(bytes, 0, count);
+	            }
+	            os.flush();
+	            os.close();
+	            is.close();
+	        } catch (Exception e) {
+	            System.out.println("Exception: " + e.getMessage());
 	            e.printStackTrace();
 	        }
 	    }
@@ -330,9 +335,9 @@ public class Client {
 					// Added by Hongzheng Wang
 					if (mode == Mode.PASSIVE) {
 						Socket xfer = new Socket(serverAddress, serverSocket.getPort());
+						svr.put(inputs[1]);
 						FileInputStream f = new FileInputStream(inputs[1]);
 						writeToSocket(xfer, f);
-			    	    svr.put(inputs[1]);
 					} else if (mode == Mode.ACTIVE) {
 						svr.put(inputs[1]);
 		                FileInputStream f = new FileInputStream(inputs[1]);
